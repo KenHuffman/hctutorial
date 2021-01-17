@@ -23,9 +23,6 @@ package com.huffmancoding.hctutorial;
 ******************************************************************************/
 
 import java.io.File;
-import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
-
 import javax.xml.bind.DatatypeConverter;
 
 /**
@@ -63,15 +60,15 @@ public class HuffmanTutorial
                 File originalFile = new File(filename).getCanonicalFile();
                 File packedFile = new File(originalFile.getParentFile(), originalFile.getName() + ".packed");
 
-                FilePacker packer = new FilePacker();
+                CharacterFilePacker packer = new CharacterFilePacker();
                 byte[] originalDigest = packer.packFile(originalFile, packedFile);
                 System.out.println("Original digest: " + DatatypeConverter.printHexBinary(originalDigest));
 
-                FileUnpacker unpacker = new FileUnpacker();
+                CharacterFileUnpacker unpacker = new CharacterFileUnpacker();
                 byte[] unpackedDigest = unpacker.unpackFile(packedFile);
                 System.out.println("Unpacked digest: " + DatatypeConverter.printHexBinary(unpackedDigest));
             }
-            catch (IOException | NoSuchAlgorithmException ex)
+            catch (Exception ex)
             {
                 // could not read the file?
                 ex.printStackTrace();
