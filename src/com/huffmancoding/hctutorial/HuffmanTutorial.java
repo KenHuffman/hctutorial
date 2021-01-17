@@ -61,10 +61,12 @@ public class HuffmanTutorial
                 File packedFile = new File(originalFile.getParentFile(), originalFile.getName() + ".packed");
 
                 CharacterFilePacker packer = new CharacterFilePacker();
+                //ByteFilePacker packer = new ByteFilePacker();
                 byte[] originalDigest = packer.packFile(originalFile, packedFile);
                 System.out.println("Original digest: " + DatatypeConverter.printHexBinary(originalDigest));
 
                 CharacterFileUnpacker unpacker = new CharacterFileUnpacker();
+                //ByteFileUnpacker unpacker = new ByteFileUnpacker();
                 byte[] unpackedDigest = unpacker.unpackFile(packedFile);
                 System.out.println("Unpacked digest: " + DatatypeConverter.printHexBinary(unpackedDigest));
             }

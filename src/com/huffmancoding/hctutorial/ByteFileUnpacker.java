@@ -22,50 +22,38 @@ package com.huffmancoding.hctutorial;
 
 ******************************************************************************/
 
-import java.io.DataOutputStream;
+import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
-import java.util.function.Consumer;
+import java.io.OutputStream;
+import java.util.Iterator;
 
 /**
- * This class uses Huffman Coding on file with characters.
+ * This class uses Huffman Coding to unpack a file that packed byte-by-byte.
  *
  * @author Ken Huffman
  */
-public class CharacterFilePacker extends FilePacker<Character>
+public class ByteFileUnpacker extends FileUnpacker<Byte>
 {
     /**
-     * Constructor.
+     * {@inheritDoc}
      */
-    CharacterFilePacker()
+    @Override
+    public Byte readObject(DataInputStream is) throws IOException
     {
-        super(Character::compare);
+        return is.readByte();
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public void readObjects(InputStream is, Consumer<Character> accumulator) throws IOException
+    public void writeObjects(OutputStream os, Iterator<Byte> iterator)
+        throws IOException
     {
-        try (Reader reader = new InputStreamReader(is))
+        while (iterator.hasNext())
         {
-            int i;
-            while ((i = reader.read()) >= 0)
-            {
-                accumulator.accept((char)i);
-            }
+            Byte b = iterator.next();
+            os.write(b);
         }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void writeObject(DataOutputStream os, Character ch) throws IOException
-    {
-        os.writeChar(ch.charValue());
     }
 }
