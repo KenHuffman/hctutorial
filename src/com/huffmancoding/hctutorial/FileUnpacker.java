@@ -48,6 +48,9 @@ import java.util.NoSuchElementException;
  */
 abstract public class FileUnpacker<T>
 {
+    /** the packed stream containing the Huffman tree and data to decode. */
+    private BitInputStream packedStream;
+
     /** the huffman tree de-serialized from the packed file. */
     private TreeNode<T> huffmanTree;
 
@@ -60,19 +63,14 @@ abstract public class FileUnpacker<T>
         /** the number of objects left in the iterator. */
         private int objectsRemaining;
 
-        /** the stream to read the compressed data from. */
-        private final BitInputStream bitIs;
-
         /**
          * Constructor.
          *
          * @param totalObjects the number of objects that should be read
-         * @param is the stream to read
          */
-        public CompressedObjectIterator(int totalObjects, BitInputStream is)
+        public CompressedObjectIterator(int totalObjects)
         {
             objectsRemaining = totalObjects;
-            bitIs = is;
         }
 
         /**
@@ -99,7 +97,7 @@ abstract public class FileUnpacker<T>
                     NonLeafNode<T> nonLeafNode = (NonLeafNode<T>)currentNode;
 
                     // arbitrarily we'll make left child the false bit
-                    currentNode = ! bitIs.readBit() ?
+                    currentNode = ! packedStream.readBit() ?
                         nonLeafNode.getLeft() : nonLeafNode.getRight();
                 }
 
@@ -131,47 +129,50 @@ abstract public class FileUnpacker<T>
         try (FileInputStream fis = new FileInputStream(packedFile);
              BitInputStream is = new BitInputStream(fis))
         {
-            huffmanTree = readHuffmanTree(is);
-            return readPackedContent(is);
+            packedStream = is;
+            huffmanTree = readHuffmanTree();
+            byte[] checksum = readPackedContent();
+            // will be closed, null out member reference
+            packedStream = null;
+            return checksum;
         }
     }
 
     /**
-     * Recursively de-serialize the Huffman Tree
+     * Recursively de-serialize the front of {@link #packedStream} to a Huffman
+     * Tree.
      *
-     * @param is the InputStream that has the Huffman Tree at the front
      * @return the Huffman Tree from the file
      * @throws IOException in case of read error
      */
-    private TreeNode<T> readHuffmanTree(BitInputStream is) throws IOException
+    private TreeNode<T> readHuffmanTree() throws IOException
     {
-        boolean isNonLeafNode = is.readBoolean();
+        boolean isNonLeafNode = packedStream.readBoolean();
         if (isNonLeafNode)
         {
-            TreeNode<T> left = readHuffmanTree(is);
-            TreeNode<T> right = readHuffmanTree(is);
+            TreeNode<T> left = readHuffmanTree();
+            TreeNode<T> right = readHuffmanTree();
             return new NonLeafNode<T>(left, right);
         }
         else
         {
-            T obj = readObject(is);
-            return new LeafNode<>(obj, 0);
+            T obj = readObject(packedStream);
+            return LeafNode.create(obj);
         }
     }
 
     /**
-     * Read the encoded data portion of the packed input stream. The unpacked
+     * Read the encoded data portion of {@link #packedStream}. The unpacked
      * data is thrown away, but its MD5 checksum is computed.
      *
-     * @param is the InputStream to read from
      * @return the MD5 checksum of the uncompressed content
      * @throws IOException in case of read error
      * @throws NoSuchAlgorithmException if MD5 not available
      */
-    private byte[] readPackedContent(BitInputStream is)
+    private byte[] readPackedContent()
         throws IOException, NoSuchAlgorithmException
     {
-        int totalObjects = is.readInt();
+        int totalObjects = packedStream.readInt();
 
         MessageDigest digest = MessageDigest.getInstance("MD5");
 
@@ -179,7 +180,7 @@ abstract public class FileUnpacker<T>
         try (NullOutputStream os = new NullOutputStream();
             DigestOutputStream digestOs = new DigestOutputStream(os, digest))
         {
-            writeObjects(digestOs, new CompressedObjectIterator(totalObjects, is));
+            writeObjects(digestOs, new CompressedObjectIterator(totalObjects));
         }
 
         return digest.digest();

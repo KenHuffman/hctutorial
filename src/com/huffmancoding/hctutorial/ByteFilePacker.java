@@ -3,7 +3,7 @@ package com.huffmancoding.hctutorial;
 /******************************************************************************
 
     HuffmanTutorial: The Huffman Coding sample code.
-    Copyright (C) 2002-2021 Kenneth D. Huffman.
+    Copyright (C) 2002-2022 Kenneth D. Huffman.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ package com.huffmancoding.hctutorial;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Comparator;
 import java.util.function.Consumer;
 
 /**
@@ -35,18 +36,19 @@ import java.util.function.Consumer;
 public class ByteFilePacker extends FilePacker<Byte>
 {
     /**
-     * Constructor.
+     * {@inheritDoc}
      */
-    ByteFilePacker()
+    @Override
+    protected Comparator<Byte> getObjectComparator()
     {
-        super(Byte::compare);
+        return Byte::compare;
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public void readObjects(InputStream is, Consumer<Byte> accumulator) throws IOException
+    protected void readObjects(InputStream is, Consumer<Byte> accumulator) throws IOException
     {
         int i; // 0 to 255
         while ((i = is.read()) >= 0)
@@ -60,7 +62,7 @@ public class ByteFilePacker extends FilePacker<Byte>
      * {@inheritDoc}
      */
     @Override
-    public void writeObject(DataOutputStream os, Byte b) throws IOException
+    protected void writeObject(DataOutputStream os, Byte b) throws IOException
     {
         os.writeByte(b);
     }

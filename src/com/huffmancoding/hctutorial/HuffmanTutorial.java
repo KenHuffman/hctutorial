@@ -3,7 +3,7 @@ package com.huffmancoding.hctutorial;
 /******************************************************************************
 
     HuffmanTutorial: The Huffman Coding sample code.
-    Copyright (C) 2002-2021 Kenneth D. Huffman.
+    Copyright (C) 2002-2022 Kenneth D. Huffman.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@ package com.huffmancoding.hctutorial;
 ******************************************************************************/
 
 import java.io.File;
-import javax.xml.bind.DatatypeConverter;
 
 /**
  * This program computes the Huffman coding tree for a file.
@@ -60,15 +59,19 @@ public class HuffmanTutorial
                 File originalFile = new File(filename).getCanonicalFile();
                 File packedFile = new File(originalFile.getParentFile(), originalFile.getName() + ".packed");
 
+                // choose a Packer based on the input
                 CharacterFilePacker packer = new CharacterFilePacker();
                 //ByteFilePacker packer = new ByteFilePacker();
-                byte[] originalDigest = packer.packFile(originalFile, packedFile);
-                System.out.println("Original digest: " + DatatypeConverter.printHexBinary(originalDigest));
 
+                byte[] originalDigest = packer.packFile(originalFile, packedFile);
+                System.out.println("Original digest: " + byteArrayToHex(originalDigest));
+
+                // choose an Unpacker based on the packer above
                 CharacterFileUnpacker unpacker = new CharacterFileUnpacker();
                 //ByteFileUnpacker unpacker = new ByteFileUnpacker();
+
                 byte[] unpackedDigest = unpacker.unpackFile(packedFile);
-                System.out.println("Unpacked digest: " + DatatypeConverter.printHexBinary(unpackedDigest));
+                System.out.println("Unpacked digest: " + byteArrayToHex(unpackedDigest));
             }
             catch (Exception ex)
             {
@@ -79,4 +82,18 @@ public class HuffmanTutorial
         }
         System.exit(exitCode);
     }
+
+    /**
+     * Convert a byte digest to a string.
+     *
+     * @param bytes the array of bytes for the digest.
+     * @return String representation of the bytes
+     */
+    public static String byteArrayToHex(byte[] bytes)
+    {
+        StringBuilder sb = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes)
+           sb.append(String.format("%02x", b));
+        return sb.toString();
+     }
 }

@@ -36,12 +36,23 @@ public class LeafNode<T> extends TreeNode<T>
     private final T object;
 
     /**
+     * Create a leaf node for an object.
+     *
+     * @param object the object to wrap
+     * @return a new LeafNode
+     */
+    public static <T> LeafNode<T> create(T object)
+    {
+        return new LeafNode<>(object, 0);
+    }
+
+    /**
      * Constructor.
      *
      * @param obj the object of the input.
      * @param frequency the number of times it appears in the input.
      */
-    public LeafNode(T obj, int frequency)
+    private LeafNode(T obj, int frequency)
     {
         super(frequency);
 
@@ -74,5 +85,13 @@ public class LeafNode<T> extends TreeNode<T>
     public void incrementFrequency()
     {
         frequency++;
+    }
+
+    /**
+     * Dump a leaf node to stdout.
+     */
+    public void dump()
+    {
+        System.out.println(getDescription() + " has frequency=" + getFrequency());
     }
 }

@@ -3,7 +3,7 @@ package com.huffmancoding.hctutorial;
 /******************************************************************************
 
     HuffmanTutorial: The Huffman Coding sample code.
-    Copyright (C) 2002-2021 Kenneth D. Huffman.
+    Copyright (C) 2002-2022 Kenneth D. Huffman.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.util.Comparator;
 import java.util.function.Consumer;
 
 /**
@@ -37,18 +38,19 @@ import java.util.function.Consumer;
 public class CharacterFilePacker extends FilePacker<Character>
 {
     /**
-     * Constructor.
+     * {@inheritDoc}
      */
-    CharacterFilePacker()
+    @Override
+    protected Comparator<Character> getObjectComparator()
     {
-        super(Character::compare);
+        return Character::compare;
     }
 
     /**
      * {@inheritDoc}
      */
     @Override
-    public void readObjects(InputStream is, Consumer<Character> accumulator) throws IOException
+    protected void readObjects(InputStream is, Consumer<Character> accumulator) throws IOException
     {
         try (Reader reader = new InputStreamReader(is))
         {
@@ -64,7 +66,7 @@ public class CharacterFilePacker extends FilePacker<Character>
      * {@inheritDoc}
      */
     @Override
-    public void writeObject(DataOutputStream os, Character ch) throws IOException
+    protected void writeObject(DataOutputStream os, Character ch) throws IOException
     {
         os.writeChar(ch.charValue());
     }
