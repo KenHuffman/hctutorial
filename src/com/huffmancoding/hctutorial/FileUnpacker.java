@@ -25,6 +25,7 @@ package com.huffmancoding.hctutorial;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.security.DigestOutputStream;
@@ -53,6 +54,9 @@ abstract public class FileUnpacker<T>
 
     /** the huffman tree de-serialized from the packed file. */
     private TreeNode<T> huffmanTree;
+
+    /** the file for the original content, can be null. */
+    private File destFile;
 
     /**
      * This iterator walks the compressed bits section of a packed file and
@@ -119,13 +123,16 @@ abstract public class FileUnpacker<T>
      * Read a compressed file for its original content.
      *
      * @param packedFile the compressed file
+     * @param originalFile the file to unpack to
      * @return the MD5 checksum of the uncompressed file
      * @throws IOException in case of read error
      * @throws NoSuchAlgorithmException if MD5 not available
      */
-    public byte[] unpackFile(File packedFile)
+    public byte[] unpackFile(File packedFile, File originalFile)
         throws IOException, NoSuchAlgorithmException
     {
+        destFile = originalFile;
+
         try (FileInputStream fis = new FileInputStream(packedFile);
              BitInputStream is = new BitInputStream(fis))
         {
@@ -177,7 +184,8 @@ abstract public class FileUnpacker<T>
         MessageDigest digest = MessageDigest.getInstance("MD5");
 
         // The os could be a FileOutputStream if we wanted to save the original content.
-        try (NullOutputStream os = new NullOutputStream();
+        try (OutputStream os = destFile == null ?
+                new NullOutputStream() : new FileOutputStream(destFile);
             DigestOutputStream digestOs = new DigestOutputStream(os, digest))
         {
             writeObjects(digestOs, new CompressedObjectIterator(totalObjects));

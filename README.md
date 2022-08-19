@@ -4,9 +4,9 @@ hctutorial
 This Java tool is an implementation of the [Huffman Coding](https://en.wikipedia.org/wiki/Huffman_coding)
 algorithm.
 
-The old Unix [pack](https://www.unix.com/man-page/all/1/pack) command
-used Huffman Coding, so the term is used here although the file 
-format of this Java code is not compatible with the old "C" code.
+The old Unix [pack](https://www.unix.com/man-page/linux/1/pack/) command
+used Huffman Coding, so the term is used here although the file
+format of this Java code is probably not compatible with the old "C" code.
 
 The Huffman Algorithm can apply to compressing streams of any type of object.
 The code includes a input stream readers of characters and another for bytes.
@@ -36,13 +36,12 @@ The main class will display the before and after MD5 checksums
 
 PROGRAM OUTPUT
 --------------
-It creates a ".packed" file.
+It creates a ".packed" file from a file specified on the command line.
+The original file is untouched.
 
-While it unpacks the packed file in memory to verify that it was created
-correctly, it does not create an unpacked file on disk from a .packed file.
+It will unpack the file specified on the command line, if it ends with ".packed".
 
 FUTURE ENHANCEMENTS
 -------------------
 
-Allow the program to take command line arguments to indicate whether to pack
-or unpack. Also allow the specification of the Packer class used on the commandline.
+Allow the specification of the Packer class used on the commandline.
