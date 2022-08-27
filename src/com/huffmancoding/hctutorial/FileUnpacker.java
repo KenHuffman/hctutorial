@@ -3,7 +3,7 @@ package com.huffmancoding.hctutorial;
 /******************************************************************************
 
     HuffmanTutorial: The Huffman Coding sample code.
-    Copyright (C) 2002-2021 Kenneth D. Huffman.
+    Copyright (C) 2002-2022 Kenneth D. Huffman.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -57,6 +57,9 @@ abstract public class FileUnpacker<T>
 
     /** the file for the original content, can be null. */
     private File destFile;
+
+    /** the MD5 checksum of the destFile. */
+    private MessageDigest digest;
 
     /**
      * This iterator walks the compressed bits section of a packed file and
@@ -131,17 +134,20 @@ abstract public class FileUnpacker<T>
     public byte[] unpackFile(File packedFile, File originalFile)
         throws IOException, NoSuchAlgorithmException
     {
+        System.out.println("Unacking file: " + packedFile);
+
         destFile = originalFile;
+        digest = MessageDigest.getInstance("MD5");
 
         try (FileInputStream fis = new FileInputStream(packedFile);
              BitInputStream is = new BitInputStream(fis))
         {
             packedStream = is;
             huffmanTree = readHuffmanTree();
-            byte[] checksum = readPackedContent();
+            readPackedContent();
             // will be closed, null out member reference
             packedStream = null;
-            return checksum;
+            return digest.digest();
         }
     }
 
@@ -170,18 +176,14 @@ abstract public class FileUnpacker<T>
 
     /**
      * Read the encoded data portion of {@link #packedStream}. The unpacked
-     * data is thrown away, but its MD5 checksum is computed.
+     * data is written to the destFile if it is not nill. The digest is updated
+     * from the unpacked data.
      *
-     * @return the MD5 checksum of the uncompressed content
      * @throws IOException in case of read error
-     * @throws NoSuchAlgorithmException if MD5 not available
      */
-    private byte[] readPackedContent()
-        throws IOException, NoSuchAlgorithmException
+    private void readPackedContent() throws IOException
     {
         int totalObjects = packedStream.readInt();
-
-        MessageDigest digest = MessageDigest.getInstance("MD5");
 
         // The os could be a FileOutputStream if we wanted to save the original content.
         try (OutputStream os = destFile == null ?
@@ -190,8 +192,6 @@ abstract public class FileUnpacker<T>
         {
             writeObjects(digestOs, new CompressedObjectIterator(totalObjects));
         }
-
-        return digest.digest();
     }
 
     /**

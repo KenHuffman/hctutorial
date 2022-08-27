@@ -57,6 +57,9 @@ public abstract class FilePacker<T>
     /** the file with the original content. */
     private File sourceFile;
 
+    /** the MD5 checksum of the sourceFile. */
+    private MessageDigest digest;
+
     /** the individual leaf nodes with counds by comparable objects. */
     private Map<T, LeafNode<T>> objectCounts = new TreeMap<>();
 
@@ -89,7 +92,11 @@ public abstract class FilePacker<T>
     public byte[] packFile(File inputFile, File packedFile)
         throws IOException, NoSuchAlgorithmException
     {
+        System.out.println("Packing file: " + inputFile);
+
         sourceFile = inputFile;
+        digest = MessageDigest.getInstance("MD5");
+
         createIndividualLeafNodes();
         NavigableSet<TreeNode<T>> sortedNodes = createSortedSetOfLeafNodes();
         mergeNodesIntoTree(sortedNodes);
@@ -99,10 +106,10 @@ public abstract class FilePacker<T>
         {
             packedStream = os;
             writeHuffmanTree();
-            byte[] checksum = writePackedContent();
+            writePackedContent();
             // will be closed, null out member reference
             packedStream = null;
-            return checksum;
+            return digest.digest();
         }
     }
 
@@ -328,16 +335,12 @@ public abstract class FilePacker<T>
 
     /**
      * Re-read the source file and write the packed bits to {@link #packedStream}.
+     * The digest is updated from the input as it is read.
      *
-     * @return the MD5 checksum of the original file
      * @throws IOException in case of write error
-     * @throws NoSuchAlgorithmException if MD5 not available
      */
-    private byte[] writePackedContent()
-        throws IOException, NoSuchAlgorithmException
+    private void writePackedContent() throws IOException
     {
-        System.out.println("Packing file: " + sourceFile);
-
         // because the remainder of the file is a stream of bits that may end
         // in the middle of a byte, we write the number characters in the
         // original file before the bit stream
@@ -346,14 +349,11 @@ public abstract class FilePacker<T>
         // we use an MD5 DigestInputStream when reading the sourceFile to
         // generate a checksum of the input. We'll compare it when the packed
         // data is re-read.
-        MessageDigest digest = MessageDigest.getInstance("MD5");
         try (FileInputStream fIs = new FileInputStream(sourceFile);
              DigestInputStream digestIs = new DigestInputStream(fIs, digest))
         {
             readObjects(digestIs, this::writeObjectBits);
         }
-
-        return digest.digest();
     }
 
     /**

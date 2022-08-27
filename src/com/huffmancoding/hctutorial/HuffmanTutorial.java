@@ -28,11 +28,13 @@ import java.security.NoSuchAlgorithmException;
 
 /**
  * This program computes the Huffman coding tree for a file.
- * It expects the name of the unpacked file as an argument to the file.
- * This program packs it to a new file.
  *
- * It will then re-read the packed file to verify file that it matches
- * by comparing MD5 checksums.
+ * It expects the name of the file as a sole argument. It will create a
+ * ".packed" file when compressing the file. It will uncompress the file on the
+ * command line if it ends with ".packed".
+ *
+ * When packing, it will then re-read the packed file to verify file that it
+ * matches by comparing MD5 checksums.
  *
  * @author Ken Huffman
  */
