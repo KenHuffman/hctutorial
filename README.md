@@ -12,6 +12,8 @@ The Huffman Algorithm can apply to compressing streams of any type of object.
 The code includes a input stream readers of characters and another for bytes.
 Readers for other more complex object types could be implemented.
 
+This program compiles with Java 17 or newer simply because I like the new instanceof syntax.
+
 PROGRAM ARGUMENTS
 -----------------
 The program takes one command line argument: the name of the text file to pack. A ".packed" file will be created.
@@ -32,7 +34,7 @@ The FileUnpacker will:
 - Read the content from the remainder of the packed file and unpacking it.
 - Computes an MD5 checksum of the contents that were unpacked.
 
-The main class will display the before and after MD5 checksums
+The main class will, from the command line file name argument, either call the FilePacker or FileUnpacker.
 
 PROGRAM OUTPUT
 --------------

@@ -99,10 +99,8 @@ abstract public class FileUnpacker<T>
             {
                 // read bits and walk the huffmanTree until we reach a leaf node
                 TreeNode<T> currentNode = huffmanTree;
-                while (currentNode instanceof NonLeafNode)
+                while (currentNode instanceof NonLeafNode<T> nonLeafNode)
                 {
-                    NonLeafNode<T> nonLeafNode = (NonLeafNode<T>)currentNode;
-
                     // arbitrarily we'll make left child the false bit
                     currentNode = ! packedStream.readBit() ?
                         nonLeafNode.getLeft() : nonLeafNode.getRight();
@@ -110,7 +108,13 @@ abstract public class FileUnpacker<T>
 
                 --objectsRemaining;
                 // after reaching a leaf node, return its object.
-                return ((LeafNode<T>)currentNode).getObject();
+                if (currentNode instanceof LeafNode<T> leafNode)
+                {
+                    return leafNode.getObject();
+                }
+
+                // if we got here, the huffmanTree contains strangeness
+                throw new RuntimeException("Unknown TreeNode type: " + currentNode.getClass().getName());
             }
             catch (IOException ex)
             {

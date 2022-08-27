@@ -205,9 +205,9 @@ public abstract class FilePacker<T>
      */
     private T getLeftmostObject(TreeNode<T> treeNode)
     {
-        while (treeNode instanceof NonLeafNode)
+        while (treeNode instanceof NonLeafNode<T> nonLeafNode)
         {
-            treeNode = ((NonLeafNode<T>)treeNode).getLeft();
+            treeNode = nonLeafNode.getLeft();
         }
 
         return ((LeafNode<T>)treeNode).getObject();
@@ -301,26 +301,22 @@ public abstract class FilePacker<T>
         // data with a flag to indicate, for later reading, what type of tree
         // node and the kind of data that follows.
         // Arbitrarily we chose a true flag for a non-leaf and false for a leaf.
-        boolean isNonLeafNode = (node instanceof NonLeafNode);
-        packedStream.writeBoolean(isNonLeafNode);
-
-        if (isNonLeafNode)
+        if (node instanceof NonLeafNode<T> nonLeafNode)
         {
-            // for a non-leaf node, write the left (0) and right (1) bits,
-            // and recurse
-            NonLeafNode<T> nonLeafNode = (NonLeafNode<T>)node;
+            packedStream.writeBoolean(true);
 
-            // arbitrarily we'll make left child the false bit
+            // for a non-leaf node, write the left (0) and right (1) bits,
+            // and recurse (arbitrarily we'll make left child the false bit)
             writeSubTree(new BitArray(pathToObject, false),
                 nonLeafNode.getLeft());
             writeSubTree(new BitArray(pathToObject, true),
                 nonLeafNode.getRight());
         }
-        else
+        else if (node instanceof LeafNode<T> leafNode)
         {
-            // for a leaf node, write the object that follows.
-            LeafNode<T> leafNode = (LeafNode<T>)node;
+            packedStream.writeBoolean(false);
 
+            // for a leaf node, write the object that follows.
             T object = leafNode.getObject();
             writeObject(packedStream, object);
 
@@ -330,6 +326,10 @@ public abstract class FilePacker<T>
             // calculate total bits for every one of these T objects
             long bitsForTheseObjects = pathToObject.length() * leafNode.getFrequency();
             totalBits += bitsForTheseObjects;
+        }
+        else {
+            // if we got here, the node is corrupt
+            throw new RuntimeException("Unknown TreeNode type: " + node.getClass().getName());
         }
     }
 
