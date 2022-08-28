@@ -40,6 +40,7 @@ import java.security.NoSuchAlgorithmException;
  */
 public class HuffmanTutorial
 {
+    /** the filename extension for packed files. */
     private static final String PACKED_EXTENSION = ".packed";
 
     /**
@@ -93,18 +94,10 @@ public class HuffmanTutorial
         File originalFile = new File(filename).getCanonicalFile();
         File packedFile = new File(originalFile.getParentFile(), originalFile.getName() + PACKED_EXTENSION);
 
-        // choose a Packer based on the input
-        CharacterFilePacker packer = new CharacterFilePacker();
-        //ByteFilePacker packer = new ByteFilePacker();
-
-        byte[] originalDigest = packer.packFile(originalFile, packedFile);
+        byte[] originalDigest = FilePacker.packFile(originalFile, packedFile);
         System.out.println("Original digest: " + byteArrayToHex(originalDigest));
 
-        // choose an Unpacker based on the packer above
-        CharacterFileUnpacker unpacker = new CharacterFileUnpacker();
-        //ByteFileUnpacker unpacker = new ByteFileUnpacker();
-
-        byte[] unpackedDigest = unpacker.unpackFile(packedFile, null);
+        byte[] unpackedDigest = FileUnpacker.unpackFile(packedFile, null);
         System.out.println("Unpacked digest: " + byteArrayToHex(unpackedDigest));
     }
 
@@ -119,12 +112,10 @@ public class HuffmanTutorial
     {
         File packedFile = new File(filename).getCanonicalFile();
         String packedName = packedFile.getName();
-        File originalFile = new File(packedFile.getParentFile(),
-            packedName.substring(0, packedName.length()-PACKED_EXTENSION.length()));
+        String unpackedName = packedName.substring(0, packedName.length()-PACKED_EXTENSION.length());
+        File originalFile = new File(packedFile.getParentFile(), unpackedName);
 
-        CharacterFileUnpacker unpacker = new CharacterFileUnpacker();
-        //ByteFileUnpacker unpacker = new ByteFileUnpacker();
-        unpacker.unpackFile(packedFile, originalFile);
+        FileUnpacker.unpackFile(packedFile, originalFile);
     }
 
     /**
@@ -137,7 +128,9 @@ public class HuffmanTutorial
     {
         StringBuilder sb = new StringBuilder(bytes.length * 2);
         for (byte b : bytes)
+        {
            sb.append(String.format("%02x", b));
+        }
         return sb.toString();
      }
 }

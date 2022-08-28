@@ -49,17 +49,30 @@ import java.util.NoSuchElementException;
  */
 abstract public class FileUnpacker<T>
 {
+    /** the file for the original content, can be null. */
+    private File destFile;
+
+    /** the MD5 checksum of the destFile. */
+    private MessageDigest digest;
+
     /** the packed stream containing the Huffman tree and data to decode. */
     private BitInputStream packedStream;
 
     /** the huffman tree de-serialized from the packed file. */
     private TreeNode<T> huffmanTree;
 
-    /** the file for the original content, can be null. */
-    private File destFile;
-
-    /** the MD5 checksum of the destFile. */
-    private MessageDigest digest;
+    /**
+     * Initialize with the file to write to.
+     *
+     * @param originalFile the file to unpack.
+     * @throws NoSuchAlgorithmException if MD5 not available
+     */
+    protected void init(File originalFile)
+        throws NoSuchAlgorithmException
+    {
+        destFile = originalFile;
+        digest = MessageDigest.getInstance("MD5");
+    }
 
     /**
      * This iterator walks the compressed bits section of a packed file and
@@ -135,23 +148,45 @@ abstract public class FileUnpacker<T>
      * @throws IOException in case of read error
      * @throws NoSuchAlgorithmException if MD5 not available
      */
-    public byte[] unpackFile(File packedFile, File originalFile)
+    public static byte[] unpackFile(File packedFile, File originalFile)
         throws IOException, NoSuchAlgorithmException
     {
-        System.out.println("Unacking file: " + packedFile);
-
-        destFile = originalFile;
-        digest = MessageDigest.getInstance("MD5");
+        System.out.println("Unpacking file: " + packedFile);
 
         try (FileInputStream fis = new FileInputStream(packedFile);
              BitInputStream is = new BitInputStream(fis))
         {
+            PackerType type = PackerType.fromSignifier(is.readByte());
+            System.out.println("PackerType: " + type.name());
+
+            PackerFactory factory = new PackerFactory();
+            FileUnpacker<?> unpacker = factory.getFileUnpacker(type);
+            unpacker.init(originalFile);
+            return unpacker.unpackStream(is);
+        }
+    }
+
+    /**
+     * Read the persisted HuffmanTree then unpack the compress data that follows.
+     *
+     * @param is the stream to read from and unpack
+     * @return the MD5 digest of the uncompressed data
+     * @throws IOException in case of read error
+     */
+    private byte[] unpackStream(BitInputStream is)
+        throws IOException
+    {
+        try
+        {
             packedStream = is;
             huffmanTree = readHuffmanTree();
             readPackedContent();
+            return digest.digest();
+        }
+        finally
+        {
             // will be closed, null out member reference
             packedStream = null;
-            return digest.digest();
         }
     }
 

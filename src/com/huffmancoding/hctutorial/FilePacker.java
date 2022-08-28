@@ -79,6 +79,18 @@ public abstract class FilePacker<T>
     private Map<T, BitArray> codeByObject;
 
     /**
+     * Initialize FilePacker with input file.
+     *
+     * @param inputFile the file to pack.
+     * @throws NoSuchAlgorithmException if MD5 not available
+     */
+    protected void init(File inputFile) throws NoSuchAlgorithmException
+    {
+        sourceFile = inputFile;
+        digest = MessageDigest.getInstance("MD5");
+    }
+
+    /**
      * This function will: Read a file and count the frequency of each character,
      * build Huffman Coding tree based on these frequencies, write a compressed
      * file containing the serialized tree followed by the encoded content.
@@ -87,29 +99,53 @@ public abstract class FilePacker<T>
      * @param packedFile the packed file with serialized Huffman tree at the front
      * @return the MD5 checksum of the sourceFile
      * @throws IOException in case of File error
-     * @throws NoSuchAlgorithmException MD5 check sum not available
+     * @throws NoSuchAlgorithmException if MD5 not available
      */
-    public byte[] packFile(File inputFile, File packedFile)
+    public static byte[] packFile(File inputFile, File packedFile)
         throws IOException, NoSuchAlgorithmException
     {
         System.out.println("Packing file: " + inputFile);
 
-        sourceFile = inputFile;
-        digest = MessageDigest.getInstance("MD5");
+        PackerFactory factory = new PackerFactory();
+        PackerType type = factory.getPackerType(inputFile.toPath());
 
+        FilePacker<?> packer = factory.getFilePacker(type);
+        packer.init(inputFile);
+        try (FileOutputStream fos = new FileOutputStream(packedFile);
+             BitOutputStream os = new BitOutputStream(fos))
+        {
+            // write breadcrumb so we know which unpacker to use
+            os.writeByte(type.toSignifier());
+
+            return packer.packStream(os);
+        }
+    }
+
+    /**
+     * Write the HuffmanTree followed by the compressed data.
+     *
+     * @param os the stream to write the packed data to.
+     * @return the MD5 digest of the uncompressed data
+     * @throws IOException in case of write error
+     */
+    private byte[] packStream(BitOutputStream os) throws IOException
+    {
         createIndividualLeafNodes();
         NavigableSet<TreeNode<T>> sortedNodes = createSortedSetOfLeafNodes();
         mergeNodesIntoTree(sortedNodes);
 
-        try (FileOutputStream fos = new FileOutputStream(packedFile);
-             BitOutputStream os = new BitOutputStream(fos))
+        try
         {
             packedStream = os;
+
             writeHuffmanTree();
             writePackedContent();
+            return digest.digest();
+        }
+        finally
+        {
             // will be closed, null out member reference
             packedStream = null;
-            return digest.digest();
         }
     }
 

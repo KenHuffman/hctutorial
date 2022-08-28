@@ -23,6 +23,7 @@ PROGRAM INPUT
 This program is split into a FilePacker and a FileUnpacker.
 The FilePacker will:
 
+- Analyze the file to determine which Packer to use
 - Count the number of characters in the input.
 - Build leaf nodes for each unique character with its frequency.
 - Build a combined Huffman tree from the leaf nodes.
@@ -30,6 +31,7 @@ The FilePacker will:
 - Re-read the original, computing an MD5 checksum, and appending the packed content.
 
 The FileUnpacker will:
+- Read the signifier of the Unpacker that should be used
 - Read the Huffman tree back in from the file just written.
 - Read the content from the remainder of the packed file and unpacking it.
 - Computes an MD5 checksum of the contents that were unpacked.
@@ -42,8 +44,3 @@ It creates a ".packed" file from a file specified on the command line.
 The original file is untouched.
 
 It will unpack the file specified on the command line, if it ends with ".packed".
-
-FUTURE ENHANCEMENTS
--------------------
-
-Allow the specification of the Packer class used on the commandline.
