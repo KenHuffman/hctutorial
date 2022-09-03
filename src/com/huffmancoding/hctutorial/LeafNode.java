@@ -94,4 +94,13 @@ public class LeafNode<T> extends TreeNode<T>
     {
         System.out.println(getDescription() + " has frequency=" + getFrequency());
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public T getLeftmodeObject()
+    {
+        return getObject();
+    }
 }

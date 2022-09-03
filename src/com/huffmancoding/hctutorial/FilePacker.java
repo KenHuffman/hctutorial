@@ -22,7 +22,6 @@ package com.huffmancoding.hctutorial;
 
 ******************************************************************************/
 
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -38,7 +37,6 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.function.Consumer;
 
 /**
  * This class uses Huffman Coding to convert a file into a compressed one.
@@ -52,16 +50,16 @@ import java.util.function.Consumer;
  *
  * @author Ken Huffman
  */
-public abstract class FilePacker<T>
+public class FilePacker<T>
 {
     /** the file with the original content. */
-    private File sourceFile;
+    private final File sourceFile;
 
-    /** the MD5 checksum of the sourceFile. */
-    private MessageDigest digest;
+    /** the class that knows how to read the objects from the #sourceFile. */
+    private final StreamConverter<T> converter;
 
     /** the individual leaf nodes with counds by comparable objects. */
-    private Map<T, LeafNode<T>> objectCounts = new TreeMap<>();
+    private final Map<T, LeafNode<T>> objectCounts = new TreeMap<>();
 
     /** The number of objects (characters?) in the file. */
     private int totalObjects = 0;
@@ -72,9 +70,6 @@ public abstract class FilePacker<T>
     /** the huffman tree built from the original data. */
     private TreeNode<T> huffmanTree;
 
-    /** the stream to write packed data to */
-    private BitOutputStream packedStream;
-
     /** the "inverted" tree with the bits for each leaf node. */
     private Map<T, BitArray> codeByObject;
 
@@ -82,12 +77,12 @@ public abstract class FilePacker<T>
      * Initialize FilePacker with input file.
      *
      * @param inputFile the file to pack.
-     * @throws NoSuchAlgorithmException if MD5 not available
+     * @param toPackedConverter the converter than knows how to read T objects
      */
-    protected void init(File inputFile) throws NoSuchAlgorithmException
+    protected FilePacker(File inputFile, StreamConverter<T> toPackedConverter)
     {
         sourceFile = inputFile;
-        digest = MessageDigest.getInstance("MD5");
+        converter = toPackedConverter;
     }
 
     /**
@@ -107,53 +102,56 @@ public abstract class FilePacker<T>
         System.out.println("Packing file: " + inputFile);
 
         PackerFactory factory = new PackerFactory();
-        PackerType type = factory.getPackerType(inputFile.toPath());
+        ConverterType type = factory.probeConverterType(inputFile.toPath());
+        FilePacker<?> packer = factory.createFilePacker(type, inputFile);
 
-        FilePacker<?> packer = factory.getFilePacker(type);
-        packer.init(inputFile);
         try (FileOutputStream fos = new FileOutputStream(packedFile);
              BitOutputStream os = new BitOutputStream(fos))
         {
             // write breadcrumb so we know which unpacker to use
-            os.writeByte(type.toSignifier());
+            writeConverterType(type, os);
 
             return packer.packStream(os);
         }
     }
 
     /**
+     * Write a byte at the front of the file that indicates the type of
+     * StreamConverter was used, so it knows how to unpack it.
+     *
+     * @param type the type of StreamConverter that will be used for packing
+     * @param packedStream the output stream for the packed content
+     * @throws IOException is case of write error
+     */
+    private static void writeConverterType(ConverterType type, BitOutputStream packedStream)
+        throws IOException
+    {
+        packedStream.writeByte(type.toSignifier());
+    }
+
+    /**
      * Write the HuffmanTree followed by the compressed data.
      *
-     * @param os the stream to write the packed data to.
+     * @param packedStream the stream to write the packed data to.
      * @return the MD5 digest of the uncompressed data
      * @throws IOException in case of write error
+     * @throws NoSuchAlgorithmException if MD5 not available
      */
-    private byte[] packStream(BitOutputStream os) throws IOException
+    private byte[] packStream(BitOutputStream packedStream)
+        throws IOException, NoSuchAlgorithmException
     {
         createIndividualLeafNodes();
         NavigableSet<TreeNode<T>> sortedNodes = createSortedSetOfLeafNodes();
         mergeNodesIntoTree(sortedNodes);
 
-        try
-        {
-            packedStream = os;
-
-            writeHuffmanTree();
-            writePackedContent();
-            return digest.digest();
-        }
-        finally
-        {
-            // will be closed, null out member reference
-            packedStream = null;
-        }
+        writeHuffmanTree(packedStream);
+        return writePackedContent(packedStream);
     }
 
     /**
      * Counts the characters in the input fills the {@link #individualLeafNodes}
      * for each unique character.
      *
-     * @return leaf nodes for each character with their frequencies.
      * @throws IOException when the input is not readable
      */
     private void createIndividualLeafNodes()
@@ -163,7 +161,7 @@ public abstract class FilePacker<T>
 
         try (InputStream is = new FileInputStream(sourceFile))
         {
-            readObjects(is, this::addObjecToIndividualLeafNodes);
+            converter.consumeAllInput(is, this::addObjecToIndividualLeafNodes);
         }
     }
 
@@ -227,26 +225,10 @@ public abstract class FilePacker<T>
      */
     private int getTieBreakerComparator(TreeNode<T> treeNode1, TreeNode<T> treeNode2)
     {
-        Comparator<T> objectComparator = getObjectComparator();
-        T obj1 = getLeftmostObject(treeNode1);
-        T obj2 = getLeftmostObject(treeNode2);
+        Comparator<T> objectComparator = converter.getObjectComparator();
+        T obj1 = treeNode1.getLeftmodeObject();
+        T obj2 = treeNode2.getLeftmodeObject();
         return objectComparator.compare(obj1, obj2);
-    }
-
-    /**
-     * Get the "lowest" comparable T in a TreeNode
-     *
-     * @param treeNode the node to walk left on
-     * @return the compartively lowest object in the tree
-     */
-    private T getLeftmostObject(TreeNode<T> treeNode)
-    {
-        while (treeNode instanceof NonLeafNode<T> nonLeafNode)
-        {
-            treeNode = nonLeafNode.getLeft();
-        }
-
-        return ((LeafNode<T>)treeNode).getObject();
     }
 
     /**
@@ -262,11 +244,11 @@ public abstract class FilePacker<T>
      * it is easy for this function to always quick to find the least frequent
      * TreeNodes.
      *
-     * The swapping of two TreeNodes for one continues until there is
-     * only one TreeNode remaining in the collection. After the first
-     * few replacements, this code will starting merging NonLeafNodes
-     * instead of just merging LeafNodes. It all depends on the distribution
-     * of input characters.
+     * The swapping of two smaller TreeNodes for one combined TreeNode continues
+     * until there is only one TreeNode remaining in the collection that has
+     * everything. After the first few replacements, this code will starting
+     * merging NonLeafNodes instead of just merging LeafNodes. It all depends on
+     * the distribution of input objects.
      *
      * Unless the input is empty, the final entry in the Set will be a
      * NonLeafNode that has NonLeafNodes underneath it. The Huffman Tree!
@@ -287,7 +269,7 @@ public abstract class FilePacker<T>
             sortedNodes.add(parentNode);
         }
 
-        // now there is only one left in the set, return it
+        // now there is only one left in the set, return it as the top of the tree
         huffmanTree = sortedNodes.pollFirst();
     }
 
@@ -299,16 +281,17 @@ public abstract class FilePacker<T>
      * As the leaf nodes are written, the encoding map is built which helps
      * writing the packed objects laster.
      *
+     * @param packedStream the stream to serialize the Huffman Tree to
      * @throws IOException in case of write error.
      */
-    private void writeHuffmanTree() throws IOException
+    private void writeHuffmanTree(BitOutputStream packedStream) throws IOException
     {
         // this is filled during the write of the tree
         codeByObject = new HashMap<>();
 
         if (huffmanTree != null)
         {
-            writeSubTree(new BitArray(), huffmanTree);
+            writeSubTree(new BitArray(), huffmanTree, packedStream);
         }
 
         System.out.println("Total bits in compressed file: " + totalBits);
@@ -328,10 +311,11 @@ public abstract class FilePacker<T>
      *
      * @param pathToObject a String bits down to the node
      * @param node the node to continue walking down
+     * @param packedStream the stream to serialize a TreeNode to.
      * @throws IOException in case the Huffman Tree could not be serialized
      */
-    private void writeSubTree(BitArray pathToObject, TreeNode<T> node)
-        throws IOException
+    private void writeSubTree(BitArray pathToObject, TreeNode<T> node,
+        BitOutputStream packedStream) throws IOException
     {
         // When serializing each tree node, we need to preface the node's
         // data with a flag to indicate, for later reading, what type of tree
@@ -344,9 +328,9 @@ public abstract class FilePacker<T>
             // for a non-leaf node, write the left (0) and right (1) bits,
             // and recurse (arbitrarily we'll make left child the false bit)
             writeSubTree(new BitArray(pathToObject, false),
-                nonLeafNode.getLeft());
+                nonLeafNode.getLeft(), packedStream);
             writeSubTree(new BitArray(pathToObject, true),
-                nonLeafNode.getRight());
+                nonLeafNode.getRight(), packedStream);
         }
         else if (node instanceof LeafNode<T> leafNode)
         {
@@ -354,7 +338,7 @@ public abstract class FilePacker<T>
 
             // for a leaf node, write the object that follows.
             T object = leafNode.getObject();
-            writeObject(packedStream, object);
+            converter.writeHuffmanTreeObject(packedStream, object);
 
             System.out.println(leafNode.getDescription() + " has code=" + pathToObject.toString());
             codeByObject.put(object, pathToObject);
@@ -373,14 +357,20 @@ public abstract class FilePacker<T>
      * Re-read the source file and write the packed bits to {@link #packedStream}.
      * The digest is updated from the input as it is read.
      *
+     * @param packedStream the stream to the bits for each object in the original file.
+     * @return the MD5 digest of the unpacked data as it was read
      * @throws IOException in case of write error
+     * @throws NoSuchAlgorithmException if MD5 not available
      */
-    private void writePackedContent() throws IOException
+    private byte[] writePackedContent(BitOutputStream packedStream)
+        throws IOException, NoSuchAlgorithmException
     {
         // because the remainder of the file is a stream of bits that may end
         // in the middle of a byte, we write the number characters in the
         // original file before the bit stream
         packedStream.writeInt(totalObjects);
+
+        MessageDigest digest = MessageDigest.getInstance("MD5");
 
         // we use an MD5 DigestInputStream when reading the sourceFile to
         // generate a checksum of the input. We'll compare it when the packed
@@ -388,16 +378,19 @@ public abstract class FilePacker<T>
         try (FileInputStream fIs = new FileInputStream(sourceFile);
              DigestInputStream digestIs = new DigestInputStream(fIs, digest))
         {
-            readObjects(digestIs, this::writeObjectBits);
+            converter.consumeAllInput(digestIs, obj-> writeObjectBits(obj, packedStream));
         }
+
+        return digest.digest();
     }
 
     /**
      * Write the bits for an object to encoded portion of the packed file.
      *
      * @param object the object to write bits for.
+     * @param packedStream the stream to the compress bits for an ojbect.
      */
-    private void writeObjectBits(T object)
+    private void writeObjectBits(T object, BitOutputStream packedStream)
     {
         BitArray ba = codeByObject.get(object);
         for (boolean bit : ba.getBits())
@@ -411,37 +404,5 @@ public abstract class FilePacker<T>
                 throw new RuntimeException("Could not write packed bits", ex);
             }
         }
-
     }
-
-    /**
-     * If two objects have the same frequency, we need a native object
-     * tie-breaker thenCompare so two TreeNodes will never compare equal.
-     * Without a tie breaker, we would lose object that had the same
-     * frequency when they are sorted.
-     *
-     * @return a comparator for objects themselves.
-     */
-    abstract protected Comparator<T> getObjectComparator();
-
-    /**
-     * Reads the objects in the uncompressed input file, pass the objects to a
-     * function that records the,.
-     *
-     * @param is the uncompressed input file to read from
-     * @param accumulator the function to call with all the objects read
-     * @throws IOException if the read fails
-     */
-    abstract protected void readObjects(InputStream is, Consumer<T> accumulator)
-        throws IOException;
-
-    /**
-     * Writes an original object as part of the serialized Huffman Tree
-     * preceeds the compressed data.
-     *
-     * @param os the stream to write to
-     * @param object the object to write (NOT as compressed bits)
-     * @throws IOException if the write fails
-     */
-    abstract protected void writeObject(DataOutputStream os, T object) throws IOException;
 }

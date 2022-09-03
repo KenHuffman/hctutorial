@@ -3,7 +3,7 @@ package com.huffmancoding.hctutorial;
 /******************************************************************************
 
     HuffmanTutorial: The Huffman Coding sample code.
-    Copyright (C) 2002-2021 Kenneth D. Huffman.
+    Copyright (C) 2002-2022 Kenneth D. Huffman.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -23,25 +23,66 @@ package com.huffmancoding.hctutorial;
 ******************************************************************************/
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.io.Reader;
 import java.io.Writer;
+import java.util.Comparator;
 import java.util.Iterator;
+import java.util.function.Consumer;
 
 /**
- * This class uses Huffman Coding to unpack a file that originally had
- * characters.
+ * This reads/writes an unpacked files containing characters with a Reader.
+ * It also knows how to read/write characters that are part of the serialized
+ * Huffman Tree.
  *
  * @author Ken Huffman
  */
-public class CharacterFileUnpacker extends FileUnpacker<Character>
+public class CharacterStreamConverter implements StreamConverter<Character>
 {
     /**
      * {@inheritDoc}
      */
     @Override
-    public Character readObject(DataInputStream is) throws IOException
+    public Comparator<Character> getObjectComparator()
+    {
+        return Character::compare;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void consumeAllInput(InputStream is, Consumer<Character> accumulator) throws IOException
+    {
+        try (Reader reader = new InputStreamReader(is))
+        {
+            int i;
+            while ((i = reader.read()) >= 0)
+            {
+                accumulator.accept((char)i);
+            }
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void writeHuffmanTreeObject(DataOutputStream os, Character ch) throws IOException
+    {
+        os.writeChar(ch.charValue());
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Character readHuffmanTreeObject(DataInputStream is) throws IOException
     {
         return is.readChar();
     }
@@ -50,7 +91,7 @@ public class CharacterFileUnpacker extends FileUnpacker<Character>
      * {@inheritDoc}
      */
     @Override
-    public void writeObjects(OutputStream os, Iterator<Character> iterator)
+    public void writeAllToOutput(Iterator<Character> iterator, OutputStream os)
         throws IOException
     {
         try (Writer writer = new OutputStreamWriter(os))

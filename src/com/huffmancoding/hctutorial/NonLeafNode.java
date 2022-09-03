@@ -73,4 +73,13 @@ public class NonLeafNode<T> extends TreeNode<T>
     {
         return right;
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public T getLeftmodeObject()
+    {
+        return left.getLeftmodeObject();
+    }
 }

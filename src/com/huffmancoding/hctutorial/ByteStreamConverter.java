@@ -3,7 +3,7 @@ package com.huffmancoding.hctutorial;
 /******************************************************************************
 
     HuffmanTutorial: The Huffman Coding sample code.
-    Copyright (C) 2002-2022 Kenneth D. Huffman.
+    Copyright (C) 2022 Kenneth D. Huffman.
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,24 +22,29 @@ package com.huffmancoding.hctutorial;
 
 ******************************************************************************/
 
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.function.Consumer;
 
 /**
- * This class uses Huffman Coding on file by reading byte-by-byte.
+ * This reads/writes an unpacked files containing bytes.
+ * It also knows how to read/write bytes that are part of the serialized
+ * Huffman Tree.
  *
  * @author Ken Huffman
  */
-public class ByteFilePacker extends FilePacker<Byte>
+public class ByteStreamConverter implements StreamConverter<Byte>
 {
     /**
      * {@inheritDoc}
      */
     @Override
-    protected Comparator<Byte> getObjectComparator()
+    public Comparator<Byte> getObjectComparator()
     {
         return Byte::compare;
     }
@@ -48,7 +53,7 @@ public class ByteFilePacker extends FilePacker<Byte>
      * {@inheritDoc}
      */
     @Override
-    protected void readObjects(InputStream is, Consumer<Byte> accumulator) throws IOException
+    public void consumeAllInput(InputStream is, Consumer<Byte> accumulator) throws IOException
     {
         int i; // 0 to 255
         while ((i = is.read()) >= 0)
@@ -62,8 +67,31 @@ public class ByteFilePacker extends FilePacker<Byte>
      * {@inheritDoc}
      */
     @Override
-    protected void writeObject(DataOutputStream os, Byte b) throws IOException
+    public void writeHuffmanTreeObject(DataOutputStream os, Byte b) throws IOException
     {
         os.writeByte(b);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Byte readHuffmanTreeObject(DataInputStream is) throws IOException
+    {
+        return is.readByte();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void writeAllToOutput(Iterator<Byte> iterator, OutputStream os)
+        throws IOException
+    {
+        while (iterator.hasNext())
+        {
+            Byte b = iterator.next();
+            os.write(b);
+        }
     }
 }

@@ -54,4 +54,11 @@ public abstract class TreeNode<T>
     {
         return frequency;
     }
+
+    /**
+     * Get leftmode object in the tree.
+     *
+     * @return the TreeNode's object
+     */
+    public abstract T getLeftmodeObject();
 }

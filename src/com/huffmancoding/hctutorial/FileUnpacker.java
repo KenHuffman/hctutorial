@@ -22,7 +22,6 @@ package com.huffmancoding.hctutorial;
 
 ******************************************************************************/
 
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -47,31 +46,23 @@ import java.util.NoSuchElementException;
  *
  * @author Ken Huffman
  */
-abstract public class FileUnpacker<T>
+public class FileUnpacker<T>
 {
-    /** the file for the original content, can be null. */
-    private File destFile;
-
-    /** the MD5 checksum of the destFile. */
-    private MessageDigest digest;
-
-    /** the packed stream containing the Huffman tree and data to decode. */
-    private BitInputStream packedStream;
+    /** the converter that can read and write objects. */
+    private final StreamConverter<T> converter;
 
     /** the huffman tree de-serialized from the packed file. */
     private TreeNode<T> huffmanTree;
 
     /**
-     * Initialize with the file to write to.
+     * Constructor.
      *
-     * @param originalFile the file to unpack.
-     * @throws NoSuchAlgorithmException if MD5 not available
+     * @param toUnpackedConverter the converter that know how to read objects
+     * from the original file.
      */
-    protected void init(File originalFile)
-        throws NoSuchAlgorithmException
+    protected FileUnpacker(StreamConverter<T> toUnpackedConverter)
     {
-        destFile = originalFile;
-        digest = MessageDigest.getInstance("MD5");
+        converter = toUnpackedConverter;
     }
 
     /**
@@ -80,6 +71,9 @@ abstract public class FileUnpacker<T>
      */
     private class CompressedObjectIterator implements Iterator<T>
     {
+        /** the packed stream containing the Huffman tree and data to decode. */
+        private final BitInputStream packedStream;
+
         /** the number of objects left in the iterator. */
         private int objectsRemaining;
 
@@ -87,9 +81,11 @@ abstract public class FileUnpacker<T>
          * Constructor.
          *
          * @param totalObjects the number of objects that should be read
+         * @param bitIs the
          */
-        public CompressedObjectIterator(int totalObjects)
+        public CompressedObjectIterator(int totalObjects, BitInputStream bitIs)
         {
+            packedStream = bitIs;
             objectsRemaining = totalObjects;
         }
 
@@ -143,12 +139,12 @@ abstract public class FileUnpacker<T>
      * Read a compressed file for its original content.
      *
      * @param packedFile the compressed file
-     * @param originalFile the file to unpack to
+     * @param destFile the file to unpack to
      * @return the MD5 checksum of the uncompressed file
      * @throws IOException in case of read error
      * @throws NoSuchAlgorithmException if MD5 not available
      */
-    public static byte[] unpackFile(File packedFile, File originalFile)
+    public static byte[] unpackFile(File packedFile, File destFile)
         throws IOException, NoSuchAlgorithmException
     {
         System.out.println("Unpacking file: " + packedFile);
@@ -156,59 +152,64 @@ abstract public class FileUnpacker<T>
         try (FileInputStream fis = new FileInputStream(packedFile);
              BitInputStream is = new BitInputStream(fis))
         {
-            PackerType type = PackerType.fromSignifier(is.readByte());
-            System.out.println("PackerType: " + type.name());
+            ConverterType type = readConverterType(is);
 
             PackerFactory factory = new PackerFactory();
             FileUnpacker<?> unpacker = factory.getFileUnpacker(type);
-            unpacker.init(originalFile);
-            return unpacker.unpackStream(is);
+            return unpacker.unpackStream(is, destFile);
         }
+    }
+
+    /**
+     * Read the byte at the front of the file that indicates the type of
+     * StreamConverter used to pack the original file.
+     *
+     * @param packedStream the begining of the stream of packed file
+     */
+    private static ConverterType readConverterType(BitInputStream packedStream)
+        throws IOException
+    {
+        ConverterType type = ConverterType.fromSignifier(packedStream.readByte());
+        System.out.println("PackerType: " + type.name());
+        return type;
     }
 
     /**
      * Read the persisted HuffmanTree then unpack the compress data that follows.
      *
-     * @param is the stream to read from and unpack
+     * @param packedStream the stream to read from and unpack
+     * @param destFile the file to write the original data to, can be null
      * @return the MD5 digest of the uncompressed data
      * @throws IOException in case of read error
+     * @throws NoSuchAlgorithmException if MD5 not available
      */
-    private byte[] unpackStream(BitInputStream is)
-        throws IOException
+    private byte[] unpackStream(BitInputStream packedStream, File destFile)
+        throws IOException, NoSuchAlgorithmException
     {
-        try
-        {
-            packedStream = is;
-            huffmanTree = readHuffmanTree();
-            readPackedContent();
-            return digest.digest();
-        }
-        finally
-        {
-            // will be closed, null out member reference
-            packedStream = null;
-        }
+        huffmanTree = readHuffmanTree(packedStream);
+        return readPackedContent(packedStream, destFile);
     }
 
     /**
      * Recursively de-serialize the front of {@link #packedStream} to a Huffman
      * Tree.
      *
+     * @param packedStream the stream to read the Huffman Tree from
      * @return the Huffman Tree from the file
      * @throws IOException in case of read error
      */
-    private TreeNode<T> readHuffmanTree() throws IOException
+    private TreeNode<T> readHuffmanTree(BitInputStream packedStream) throws IOException
     {
         boolean isNonLeafNode = packedStream.readBoolean();
         if (isNonLeafNode)
         {
-            TreeNode<T> left = readHuffmanTree();
-            TreeNode<T> right = readHuffmanTree();
+            TreeNode<T> left = readHuffmanTree(packedStream);
+            TreeNode<T> right = readHuffmanTree(packedStream);
             return new NonLeafNode<T>(left, right);
         }
         else
         {
-            T obj = readObject(packedStream);
+            T obj = converter.readHuffmanTreeObject(packedStream);
             return LeafNode.create(obj);
         }
     }
@@ -218,39 +219,28 @@ abstract public class FileUnpacker<T>
      * data is written to the destFile if it is not nill. The digest is updated
      * from the unpacked data.
      *
+     * @param packedStream the stream to read the bits from
+     * @param destFile the file to write the unpacked (original) content to,
+     *   can be null if no file write is desired
+     * @return the MD5 digest of the uncompressed data
      * @throws IOException in case of read error
+     * @throws NoSuchAlgorithmException if MD5 not available
      */
-    private void readPackedContent() throws IOException
+    private byte[] readPackedContent(BitInputStream packedStream, File destFile) throws IOException, NoSuchAlgorithmException
     {
         int totalObjects = packedStream.readInt();
+
+        MessageDigest digest = MessageDigest.getInstance("MD5");
 
         // The os could be a FileOutputStream if we wanted to save the original content.
         try (OutputStream os = destFile == null ?
                 new NullOutputStream() : new FileOutputStream(destFile);
             DigestOutputStream digestOs = new DigestOutputStream(os, digest))
         {
-            writeObjects(digestOs, new CompressedObjectIterator(totalObjects));
+            CompressedObjectIterator iterator = new CompressedObjectIterator(totalObjects, packedStream);
+            converter.writeAllToOutput(iterator, digestOs);
         }
+
+        return digest.digest();
     }
-
-    /**
-     * Reads an original object from Huffman tree aembedded t the beginning of
-     * the compressed.
-     *
-     * @param is the uncompressed input file to read from
-     * @return the an uncompressed object
-     * @throws IOException if the read fails
-     */
-    abstract public T readObject(DataInputStream is) throws IOException;
-
-    /**
-     * Write objects to an uncompressed file from an iterator that is walking
-     * the compressed bits.
-     *
-     * @param os the stream to write to
-     * @param iterator for the objects to write (NOT as compressed bits)
-     * @throws IOException if the write fails
-     */
-    abstract public void writeObjects(OutputStream os, Iterator<T> iterator)
-        throws IOException;
 }

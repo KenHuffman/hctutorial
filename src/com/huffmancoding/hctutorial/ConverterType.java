@@ -24,14 +24,14 @@ package com.huffmancoding.hctutorial;
 
 /**
  * This enum corresponds to the types of data that can found in an unpacked
- * file. Each value has its own FilePacker and FileUnpacker.
+ * file. Each value has its own StreamConverter.
  *
  * If a new type of file is to be packed. Add a new enum value here, create a
- * new pair of Packer/Unpacker, and update the PackerFactory.
+ * new pair of StreamConverter, and update the PackerFactory.
  *
  * @author Ken Huffman
  */
-public enum PackerType
+public enum ConverterType
 {
     /** file data that should use a Reader and Writer. */
     CHARACTER((byte)0x01),
@@ -47,7 +47,7 @@ public enum PackerType
      *
      * @param signifier the byte for the packed file
      */
-    private PackerType(byte signifier)
+    private ConverterType(byte signifier)
     {
         this.signifier = signifier;
     }
@@ -68,9 +68,9 @@ public enum PackerType
      * @param signifier
      * @return the enum to determine the Unpacker
      */
-    public static PackerType fromSignifier(byte signifier)
+    public static ConverterType fromSignifier(byte signifier)
     {
-        for (PackerType value : values())
+        for (ConverterType value : values())
         {
             if (value.signifier == signifier)
             {

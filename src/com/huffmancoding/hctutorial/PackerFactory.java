@@ -22,10 +22,10 @@ package com.huffmancoding.hctutorial;
 
 ******************************************************************************/
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.NoSuchAlgorithmException;
 
 /**
  * This factory class will create FilePackers and FileUnpackers for the
@@ -41,20 +41,20 @@ public class PackerFactory
      *
      * @param unpackedPath the path to the file to probe
      * @return The packer that should be used for the type of file
-     * @throws IOException if an I/O error occurs
+     * @throws IOException if the path could not be probed
      */
-    public PackerType getPackerType(Path unpackedPath) throws IOException
+    public ConverterType probeConverterType(Path unpackedPath) throws IOException
     {
         String contentType = Files.probeContentType(unpackedPath);
         System.out.println("ContentType: " + contentType);
 
         if (contentType.startsWith("text"))
         {
-            return PackerType.CHARACTER;
+            return ConverterType.CHARACTER;
         }
         else
         {
-            return PackerType.BYTE;
+            return ConverterType.BYTE;
         }
     }
 
@@ -62,16 +62,15 @@ public class PackerFactory
      * Create a {@link FilePacker} that should be used with a particular type of file.
      *
      * @param type the type of Packer determined examining the unpacked file.
+     * @param inputFile the unpacked file to pack
      * @return the FilePacker to use to write the compressed data
-     * @throws NoSuchAlgorithmException if MD5 not available
      */
-    public FilePacker<?> getFilePacker(PackerType type)
-        throws NoSuchAlgorithmException
+    public FilePacker<?> createFilePacker(ConverterType type, File inputFile)
     {
         return switch (type)
         {
-            case CHARACTER -> new CharacterFilePacker();
-            case BYTE -> new ByteFilePacker();
+            case CHARACTER -> new FilePacker<Character>(inputFile, new CharacterStreamConverter());
+            case BYTE -> new FilePacker<Byte>(inputFile, new ByteStreamConverter());
         };
     }
 
@@ -81,15 +80,13 @@ public class PackerFactory
      * @param type the type of Packer determine by examing the first byte of the
      * packed file
      * @return the FileUnpacker to use to read the compressed data
-     * @throws NoSuchAlgorithmException if MD5 not available
      */
-    public FileUnpacker<?> getFileUnpacker(PackerType type)
-        throws NoSuchAlgorithmException
+    public FileUnpacker<?> getFileUnpacker(ConverterType type)
     {
         return switch (type)
         {
-            case CHARACTER -> new CharacterFileUnpacker();
-            case BYTE -> new ByteFileUnpacker();
+            case CHARACTER -> new FileUnpacker<Character>(new CharacterStreamConverter());
+            case BYTE -> new FileUnpacker<Byte>(new ByteStreamConverter());
         };
     }
 }
