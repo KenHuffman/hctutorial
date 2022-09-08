@@ -29,7 +29,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.function.Consumer;
 
 /**
  * This reads/writes an unpacked files containing bytes.
@@ -40,6 +39,67 @@ import java.util.function.Consumer;
  */
 public class ByteStreamConverter implements StreamConverter<Byte>
 {
+    /**
+     * This is an Iterator for all the Bytes in an original file.
+     */
+    private static class ByteIterator implements Iterator<Byte>
+    {
+        /** The stream to read for bytes. */
+        private InputStream is;
+
+        /** the byte to return with the {@link #next()} call. */
+        private int nextByte;
+
+        /**
+         * Constructor.
+         *
+         * @param bytesIs the input stream to read bytes from
+         */
+        public ByteIterator(InputStream bytesIs)
+        {
+            is = bytesIs;
+            nextByte = readNextByte();
+        }
+
+        /**
+         * {@inheritDoc}}
+         */
+        @Override
+        public boolean hasNext()
+        {
+            return nextByte >= 0;
+        }
+
+        /**
+         * {@inheritDoc}}
+         */
+        @Override
+        public Byte next()
+        {
+            return (byte)(nextByte > Byte.MAX_VALUE ? nextByte - 256 : nextByte); // -128 to 127
+        }
+
+        /**
+         * Read the next byte to be returned next time.
+         *
+         * @return the byte that was read, -1 if end of stream
+         */
+        private int readNextByte()
+        {
+            int i;
+            try
+            {
+                i = is.read();
+            }
+            catch (IOException ex)
+            {
+                i = -1;
+            }
+
+            return i;
+        }
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -53,14 +113,9 @@ public class ByteStreamConverter implements StreamConverter<Byte>
      * {@inheritDoc}
      */
     @Override
-    public void consumeAllInput(InputStream is, Consumer<Byte> accumulator) throws IOException
+    public Iterator<Byte> inputStreamIterator(InputStream is)
     {
-        int i; // 0 to 255
-        while ((i = is.read()) >= 0)
-        {
-            byte b = (byte)(i > Byte.MAX_VALUE ? i - 256 : i); // -128 to 127
-            accumulator.accept(b);
-        }
+        return new ByteIterator(is);
     }
 
     /**

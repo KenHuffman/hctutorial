@@ -33,6 +33,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.TreeMap;
@@ -161,7 +162,8 @@ public class FilePacker<T>
 
         try (InputStream is = new FileInputStream(sourceFile))
         {
-            converter.consumeAllInput(is, this::addObjecToIndividualLeafNodes);
+            Iterator<T> iterator = converter.inputStreamIterator(is);
+            iterator.forEachRemaining(this::addObjecToIndividualLeafNodes);
         }
     }
 
@@ -378,7 +380,11 @@ public class FilePacker<T>
         try (FileInputStream fIs = new FileInputStream(sourceFile);
              DigestInputStream digestIs = new DigestInputStream(fIs, digest))
         {
-            converter.consumeAllInput(digestIs, obj-> writeObjectBits(obj, packedStream));
+            Iterator<T> iterator = converter.inputStreamIterator(digestIs);
+            while (iterator.hasNext())
+            {
+                writeObjectBits(iterator.next(), packedStream);
+            }
         }
 
         return digest.digest();

@@ -33,7 +33,6 @@ import java.io.Reader;
 import java.io.Writer;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.function.Consumer;
 
 /**
  * This reads/writes an unpacked files containing characters with a Reader.
@@ -44,6 +43,80 @@ import java.util.function.Consumer;
  */
 public class CharacterStreamConverter implements StreamConverter<Character>
 {
+    /**
+     * This is an iterator for all the Characters in an original file.
+     */
+    private static class CharacterIterator implements Iterator<Character>
+    {
+        /** The reader to read for characters. */
+        private final Reader reader;
+
+        /** the char to return with the {@link #next()} call. */
+        private int nextChar;
+
+        /**
+         * Constructor.
+         *
+         * @param is the input stream to read chars from
+         */
+        public CharacterIterator(InputStream is)
+        {
+            reader = new InputStreamReader(is);
+            nextChar = readNextChar();
+        }
+
+        /**
+         * {@inheritDoc}}
+         */
+        @Override
+        public boolean hasNext()
+        {
+            return nextChar >= 0;
+        }
+
+        /**
+         * {@inheritDoc}}
+         */
+        @Override
+        public Character next()
+        {
+            char value = (char)nextChar;
+            nextChar = readNextChar();
+            return value;
+        }
+
+        /**
+         * Read the next char to be returned next time.
+         *
+         * @return the char that was read, -1 if end of reader.
+         */
+        private int readNextChar()
+        {
+            int i;
+            try
+            {
+                i = reader.read();
+            }
+            catch (IOException ex)
+            {
+                i = -1;
+            }
+
+            if (i < 0)
+            {
+                try
+                {
+                    reader.close();
+                }
+                catch (IOException ex)
+                {
+                    throw new RuntimeException(ex);
+                }
+            }
+            return i;
+        }
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -57,16 +130,9 @@ public class CharacterStreamConverter implements StreamConverter<Character>
      * {@inheritDoc}
      */
     @Override
-    public void consumeAllInput(InputStream is, Consumer<Character> accumulator) throws IOException
+    public Iterator<Character> inputStreamIterator(InputStream is)
     {
-        try (Reader reader = new InputStreamReader(is))
-        {
-            int i;
-            while ((i = reader.read()) >= 0)
-            {
-                accumulator.accept((char)i);
-            }
-        }
+        return new CharacterIterator(is);
     }
 
     /**

@@ -29,7 +29,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.function.Consumer;
 
 /**
  * The Huffman Algorithm can compress different types of data. It has been used
@@ -52,15 +51,11 @@ public interface StreamConverter<T>
     public Comparator<T> getObjectComparator();
 
     /**
-     * Reads the objects in the uncompressed input file, pass the objects to a
-     * function that does something with them.
+     * Returns an interator for every object in the uncompressed input file.
      *
      * @param is the uncompressed input file to read from
-     * @param accumulator the function to call with all the objects read
-     * @throws IOException if the read fails
      */
-    public void consumeAllInput(InputStream is, Consumer<T> accumulator)
-        throws IOException;
+    public Iterator<T> inputStreamIterator(InputStream is);
 
     /**
      * Writes an original object as part of the serialized Huffman Tree
